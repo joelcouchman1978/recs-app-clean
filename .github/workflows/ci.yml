@@ -10,4 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - run: echo OK
+      - name: Check if web exists
+        id: has_web
+        run: |
+          if [ -f apps/web/package.json ]; then echo "HAS_WEB=true" >> "$GITHUB_ENV"; fi
+      - uses: actions/setup-node@v4
+        if: env.HAS_WEB == 'true'
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - name: Build web
+        if: env.HAS_WEB == 'true'
+        run: |
+          corepack enable || true
+          pnpm -C apps/web install
+          pnpm -C apps/web build
