@@ -1,13 +1,77 @@
 name: CI
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [ "main", "feature/**", "ci/**", "chore/**", "docs/**" ]
+
 jobs:
   test-and-health:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - run: echo OK
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install API deps
+        run: |
+          if [ -f apps/api/requirements.txt ]; then
+            python -m pip install -U pip wheel
+            pip install -r apps/api/requirements.txt
+          else
+            echo "apps/api/requirements.txt missing"; exit 1
+          fi
+
+      - name: Detect FastAPI app
+        id: detect
+        run: |
+          python - <<'PY'
+import importlib
+cands=[("apps.api.app.main","app"),("apps.api.app.__init__","app"),("apps.api.app.recs","app")]
+for m,a in cands:
+    try:
+        mod=importlib.import_module(m)
+        if hasattr(mod,a):
+            print(f"APP_IMPORT={m}:{a}")
+            break
+    except Exception:
+        pass
+else:
+    print("APP_IMPORT=")
+PY
+
+      - name: Export APP_IMPORT
+        run: |
+          APP_IMPORT=$(grep '^APP_IMPORT=' -m1 <<<"${{ steps.detect.outputs.stdout }}" | sed 's/^APP_IMPORT=//')
+          echo "APP_IMPORT=$APP_IMPORT" >> $GITHUB_ENV
+
+      - name: Healthcheck API
+        env:
+          APP_IMPORT: ${{ env.APP_IMPORT }}
+        run: |
+          if [ -z "$APP_IMPORT" ]; then echo "APP_IMPORT not found"; exit 1; fi
+          nohup python -m uvicorn "$APP_IMPORT" --host 127.0.0.1 --port 8000 >/dev/null 2>&1 & echo $! > app.pid
+          end=$((SECONDS+60)); ok=0
+          while [ $SECONDS -lt $end ]; do
+            curl -fsS http://127.0.0.1:8000/readyz >/dev/null 2>&1 && { ok=1; break; }
+            sleep 2
+          done
+          [ "$ok" -eq 1 ] || { echo "healthcheck failed"; kill $(cat app.pid) || true; exit 1; }
+          kill $(cat app.pid) || true
+
+      - uses: actions/setup-node@v4
+        if: hashFiles('apps/web/package.json') != ''
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Build web
+        if: hashFiles('apps/web/package.json') != ''
+        run: |
+          corepack enable || true
+          pnpm --version || npm i -g pnpm
+          pnpm -C apps/web install
+          pnpm -C apps/web build
