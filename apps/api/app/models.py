@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List
 
-from sqlalchemy import JSON
+from sqlalchemy import Column, JSON
 from sqlmodel import SQLModel, Field, Relationship
 
 from .settings import settings
@@ -42,7 +42,7 @@ class User(SQLModel, table=True):
     email: str = Field(index=True, unique=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    profiles: list[Profile] = Relationship(back_populates="user")  # type: ignore
+    profiles: List[Profile] = Relationship(back_populates="user")  # type: ignore
 
 
 class Profile(SQLModel, table=True):
@@ -51,7 +51,7 @@ class Profile(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id")
     name: ProfileName
     age_limit: Optional[int] = None
-    boundaries: dict = Field(default_factory=dict, sa_column_kwargs={"type_": JSONType})
+    boundaries: dict = Field(default_factory=dict, sa_column=Column(JSONType))
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     user: Optional[User] = Relationship(back_populates="profiles")
@@ -66,9 +66,9 @@ class Show(SQLModel, table=True):
     tmdb_id: Optional[int] = None
     imdb_id: Optional[str] = None
     jw_id: Optional[int] = None
-    metadata: dict = Field(default_factory=dict, sa_column_kwargs={"type_": JSONType})
-    warnings: list = Field(default_factory=list, sa_column_kwargs={"type_": JSONType})
-    flags: list = Field(default_factory=list, sa_column_kwargs={"type_": JSONType})
+    meta: dict = Field(default_factory=dict, sa_column=Column("metadata", JSONType))
+    warnings: List[str] = Field(default_factory=list, sa_column=Column(JSONType))
+    flags: List[str] = Field(default_factory=list, sa_column=Column(JSONType))
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -112,13 +112,13 @@ class Rating(SQLModel, table=True):
 class EmbeddingShow(SQLModel, table=True):
     __tablename__ = "embeddings_show"
     show_id: uuid.UUID = Field(foreign_key="shows.id", primary_key=True)
-    emb: list[float] = Field(sa_column_kwargs={"type_": _array_type(item_type=float)})
+    emb: List[float] = Field(sa_column_kwargs={"type_": _array_type(item_type=float)})
 
 
 class EmbeddingProfile(SQLModel, table=True):
     __tablename__ = "embeddings_profile"
     profile_id: int = Field(foreign_key="profiles.id", primary_key=True)
-    emb: list[float] = Field(sa_column_kwargs={"type_": _array_type(item_type=float)})
+    emb: List[float] = Field(sa_column_kwargs={"type_": _array_type(item_type=float)})
 
 
 class Watchlist(SQLModel, table=True):
@@ -134,6 +134,6 @@ class Event(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     profile_id: int
     kind: str
-    payload: dict = Field(default_factory=dict, sa_column_kwargs={"type_": JSONType})
+    payload: dict = Field(default_factory=dict, sa_column=Column(JSONType))
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
