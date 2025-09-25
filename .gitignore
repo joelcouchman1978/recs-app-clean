@@ -5,3 +5,10 @@ actions-runner/
 
 
 actions-runner/
+
+node_modules/
+.pnpm-store/
+.next/
+dist/
+build/
+actions-runner/
