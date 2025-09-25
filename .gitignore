@@ -1,0 +1,5 @@
+# noop Thu 25 Sep 2025 10:09:08 AEST
+
+# Ignore local GitHub Actions runner
+actions-runner/
+
