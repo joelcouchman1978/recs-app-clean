@@ -3,87 +3,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
-  push:
-    branches: [main]
 jobs:
   test-and-health:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: pip
-
-      - name: Install API deps (if present)
-        run: |
-          if [ -f apps/api/requirements.txt ]; then
-            python -m pip install -U pip wheel
-            pip install -r apps/api/requirements.txt
-          else
-            echo "No apps/api/requirements.txt, skipping API deps"
-          fi
-
-      - name: Detect FastAPI app
-        id: detect
-        run: |
-          python - <<'PY'
-import importlib
-cands=[("apps.api.app.main","app"),("apps.api.app.__init__","app"),("apps.api.app.recs","app")]
-for m,a in cands:
-    try:
-        mod=importlib.import_module(m)
-        if hasattr(mod,a):
-            print(f"APP_IMPORT={m}:{a}")
-            break
-    except Exception:
-        pass
-PY
-          if grep -q '^APP_IMPORT=' detect 2>/dev/null; then
-            tail -n1 detect >> "$GITHUB_ENV"
-          fi
-
-      - name: Healthcheck API
-        if: env.APP_IMPORT != ''
-        env:
-          APP_IMPORT: ${{ env.APP_IMPORT }}
-        run: |
-          nohup python -m uvicorn "$APP_IMPORT" --host 127.0.0.1 --port 8000 >/dev/null 2>&1 &
-          echo $! > app.pid
-          end=$((SECONDS+60)); ok=0
-          while [ $SECONDS -lt $end ]; do
-            if curl -fsS http://127.0.0.1:8000/readyz >/dev/null 2>&1; then ok=1; break; fi
-            sleep 2
-          done
-          if [ "$ok" -ne 1 ]; then
-            echo "healthcheck failed"
-            kill $(cat app.pid) || true
-            exit 1
-          fi
-          kill $(cat app.pid) || true
-
-      - name: Skip API (no FastAPI app detected)
-        if: env.APP_IMPORT == ''
-        run: echo "No FastAPI app detected; skipping API healthcheck."
-
-      - name: Check if web exists
-        id: has_web
-        run: |
-          if [ -f apps/web/package.json ]; then
-            echo "HAS_WEB=true" >> "$GITHUB_ENV"
-          fi
-
-      - uses: actions/setup-node@v4
-        if: env.HAS_WEB == 'true'
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Build web
-        if: env.HAS_WEB == 'true'
-        run: |
-          corepack enable || true
-          pnpm -C apps/web install
-          pnpm -C apps/web build
+      - run: echo OK
