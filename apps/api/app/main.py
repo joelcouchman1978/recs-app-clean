@@ -50,3 +50,41 @@ async def recommendations(req: RecRequest):
     items = [i for i in items if keep(req, i)]
     items = items[: req.limit]
     return {"user_id": req.user_id, "source": getattr(prov, "name", "?"), "items": items}
+
+
+from fastapi import FastAPI, Query
+from pydantic import BaseModel
+import os
+import asyncio
+
+from .providers.localdemo import Local
+from .providers.justwatch import JW
+from .providers.serialized import SZ
+
+@app.get("/recommendations")
+async def recommendations_get(for_: str | None = Query(default=None, alias="for"), seed: int | None = None, intent: str | None = None, explain: bool | None = None, limit: int = 10, include_tags: list[str] | None = Query(default=None), exclude_tags: list[str] | None = Query(default=None)):
+    prov = pick_provider()
+    req = RecRequest(user_id=for_, limit=limit, include_tags=include_tags, exclude_tags=exclude_tags)
+    items = await prov.search(q=None, limit=200)
+    items = [i for i in items if keep(req, i)]
+    items = items[: req.limit]
+    payload = {"user_id": req.user_id, "source": getattr(prov, "name", "?"), "items": items}
+    if explain:
+        payload["family"] = {"strong_min_fit": [], "warning": "explain-mode stub"}
+    return payload
+
+
+from prometheus_client import CollectorRegistry, Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+
+_registry = CollectorRegistry()
+_reqs_latency = Histogram("recs_request_latency_ms", "Request latency", buckets=[1,5,10,25,50,100,250,500,1000], unit="milliseconds", registry=_registry)
+_cache_hits = Counter("recs_cache_hits_total", "Cache hits", registry=_registry)
+_cache_misses = Counter("recs_cache_misses_total", "Cache misses", registry=_registry)
+_stale_ratio = Histogram("recs_stale_ratio_bucket", "Stale ratio", buckets=[0,0.25,0.5,0.75,1.0], registry=_registry)
+_build_info = Gauge("recs_build_info", "Build info", ["version"], registry=_registry)
+_build_info.labels(version=app.version).set(1)
+
+@app.get("/metrics")
+async def metrics():
+    data = generate_latest(_registry)
+    return FastAPI.responses.Response(content=data, media_type=CONTENT_TYPE_LATEST)
