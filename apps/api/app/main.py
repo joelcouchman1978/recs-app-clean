@@ -70,15 +70,13 @@ async def shows(q: str | None = Query(default=None), limit: int = 20):
     items = await prov.search(q=q, limit=limit)
     return {"source": getattr(prov, "name", "?"), "items": items}
 
+
 @app.post("/recommendations")
-async def recommendations(req: RecRequest):
+async def recommendations_post(req: RecRequest):
     prov = pick_provider()
     items = await prov.search(q=None, limit=200)
     items = [i for i in items if keep(req, i)]
-    items = items[: req.limit]
-    return {"user_id": req.user_id, "source": getattr(prov, "name", "?"), "items": items}
-
-
+    return {"user_id": req.user_id, "source": getattr(prov, "name", "?"), "items": items[: req.limit]}
 from fastapi import FastAPI, Query, Response, Response, Response
 from pydantic import BaseModel
 import os
