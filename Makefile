@@ -1,3 +1,4 @@
+export PYTHONPATH:=$(PWD)
 .PHONY: preflight preflight-family refresh-dry smoke open-prom open-grafana open-alerts api-local api-local-stop preflight-local sandbox-smoke
 
 API_BASE ?= http://localhost:8000
