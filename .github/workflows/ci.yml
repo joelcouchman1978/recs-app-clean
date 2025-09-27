@@ -1,10 +1,48 @@
 name: CI
 on:
+  push:
+    branches: [ main ]
   pull_request:
-    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test-and-health:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      USE_SQLITE: "1"
+      DISABLE_REDIS: "1"
     steps:
       - uses: actions/checkout@v4
-      - run: echo OK
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install deps
+        run: |
+          python -m pip install -U pip wheel
+          [ -f requirements.txt ] && pip install -r requirements.txt || true
+          [ -f apps/api/pyproject.toml ] && pip install -e apps/api || true
+          [ -f apps/api/requirements.txt ] && pip install -r apps/api/requirements.txt || true
+      - name: Start API and wait for /readyz
+        run: |
+          nohup make api-local >/dev/null 2>&1 & echo $! > api.pid
+          end=$((SECONDS+90)); ok=0
+          until [ $SECONDS -ge $end ]; do
+            curl -fsS http://127.0.0.1:8000/readyz >/dev/null 2>&1 && { ok=1; break; }
+            sleep 2
+          done
+          [ "$ok" -eq 1 ] || { echo "API /readyz failed to come up"; kill $(cat api.pid) || true; exit 1; }
+      - name: Run preflight
+        env:
+          API_BASE: http://127.0.0.1:8000
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          make preflight
+      - name: Shutdown API
+        if: always()
+        run: |
+          [ -f api.pid ] && kill $(cat api.pid) || true
