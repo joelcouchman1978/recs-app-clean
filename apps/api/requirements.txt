@@ -5,3 +5,5 @@ starlette
 sqlmodel
 typing-extensions
 anyio
+
+httpx>=0.27

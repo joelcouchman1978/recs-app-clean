@@ -1,3 +1,18 @@
+# AU TV Recommender — Quick Start
+
+## Local
+
+```bash
+make api-local
+make preflight-local
+```
+
+## Provider switch
+
+```bash
+PROVIDER=serialized make api-local
+```
+
 # Personalised TV Show Recommender (MVP)
 
 Monorepo for a web-based, text-only hybrid TV recommender for three profiles (Ross, Wife, Son) plus a Family Mix mode. AU region availability, spoiler-averse copy, transparent rationales.
