@@ -12,3 +12,10 @@ node_modules/
 dist/
 build/
 actions-runner/
+.venv/
+.venv_*/
+_logs/
+actions-runner/
+*.pyc
+__pycache__/
+.DS_Store
